@@ -36,9 +36,14 @@ extern float tg_master_vol;
 
 // vibrato frequency
 extern float tg_vibrato;
+
 // percussion intensity
 extern float tg_percussion;
 
+// reverb intensity
+extern float tg_reverb;
+
 // all sound off
 extern void tg_panic( void );
+
 

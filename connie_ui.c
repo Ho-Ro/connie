@@ -57,8 +57,8 @@ typedef struct {
 
 // our model 0, the original connie
 #define STOPS_0 4
-#define DRAWBARS_0 9
-int ui_draw_0[DRAWBARS_0] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+#define DRAWBARS_0 10
+int ui_draw_0[DRAWBARS_0] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 ui_t ui_ui_0[DRAWBARS_0] = {
   { " 16  ", 'Q', 'A' }, // stops
   { "  8  ", 'W', 'S' }, //   " 
@@ -67,32 +67,33 @@ ui_t ui_ui_0[DRAWBARS_0] = {
   { "  ~  ", 'T', 'G' }, // voice
   { "  M  ", 'Y', 'H' }, //   " 
   { "sharp", 'U', 'J' }, //   " 
-  { "perc.", 'I', 'K' }, // percussion
-  { "vibr.", 'O', 'L' }  // vibrato
+  { "perc.", 'Z', 'X' }, // percussion
+  { "vibr.", 'C', 'V' }, // vibrato
+  { "rev. ", 'B', 'N' }  // reverb
 };
 
 // some program presets
 #define PRESETS_0 10
 // the drawbar volumes (vol_xx = 0..8)
 static int ui_preset_0[PRESETS_0][DRAWBARS_0] = {
-    { 6, 8, 6, 8, 8, 4, 0, 0, 0 }, // preset 0
-    { 0, 8, 6, 8, 4, 8, 4, 0, 0 }, // preset 1
-    { 0, 8, 8, 8, 0, 8, 8, 0, 0 }, // preset 2
-    { 4, 8, 4, 6, 8, 4, 0, 1, 0 }, // preset 3
-    { 4, 8, 6, 4, 8, 0, 0, 2, 0 }, // preset 4
-    { 8, 0, 0, 0, 8, 0, 0, 4, 0 }, // preset 5
-    { 0, 8, 0, 0, 8, 0, 0, 0, 0 }, // preset 6
-    { 0, 0, 8, 0, 8, 0, 0, 0, 0 }, // preset 7
-    { 0, 0, 0, 8, 8, 0, 0, 0, 0 }, // preset 8
-    { 8, 8, 8, 8, 8, 8, 8, 8, 0 }  // preset 9
+    { 6, 8, 6, 8, 8, 4, 0, 0, 0, 0 }, // preset 0
+    { 0, 8, 6, 8, 4, 8, 4, 0, 0, 0 }, // preset 1
+    { 0, 8, 8, 8, 0, 8, 8, 0, 0, 0 }, // preset 2
+    { 4, 8, 4, 6, 8, 4, 0, 1, 0, 0 }, // preset 3
+    { 4, 8, 6, 4, 8, 0, 0, 2, 0, 0 }, // preset 4
+    { 8, 0, 0, 0, 8, 0, 0, 4, 0, 0 }, // preset 5
+    { 0, 8, 0, 0, 8, 0, 0, 0, 0, 0 }, // preset 6
+    { 0, 0, 8, 0, 8, 0, 0, 0, 0, 0 }, // preset 7
+    { 0, 0, 0, 8, 8, 0, 0, 0, 0, 0 }, // preset 8
+    { 8, 8, 8, 8, 8, 8, 8, 8, 0, 0 }  // preset 9
 };
 
 
 
 // the test model with individual drawbars for each tonegen stop
 #define STOPS_1 9
-#define DRAWBARS_1 (STOPS_1+2)
-int ui_draw_1[DRAWBARS_1] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+#define DRAWBARS_1 (STOPS_1+3)
+int ui_draw_1[DRAWBARS_1] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 ui_t ui_ui_1[DRAWBARS_1] = {
   { " 16  ", 'Q', 'A' }, // stops
   { "5 1/3", 'W', 'S' }, //   " 
@@ -104,22 +105,23 @@ ui_t ui_ui_1[DRAWBARS_1] = {
   { "1 1/3", 'I', 'K' }, //   " 
   { "  1  ", 'O', 'L' }, //   " 
   { "perc.", 'Z', 'X' }, // percussion
-  { "vibr.", 'C', 'V' }  // vibrato
+  { "vibr.", 'C', 'V' }, // vibrato
+  { "rev. ", 'B', 'N' }  // reverb
 };
 
 #define PRESETS_1 10
 // the drawbar volumes (vol_xx = 0..8)
 static int ui_preset_1[PRESETS_1][DRAWBARS_1] = {
-    { 4, 2,   7, 8, 6, 6,   2, 4, 4,   0, 0 }, // preset 0
-    { 0, 0,   4, 5, 4, 5,   4, 4, 0,   0, 0 }, // preset 1
-    { 0, 0,   4, 4, 3, 2,   2, 2, 0,   0, 0 }, // preset 2
-    { 0, 0,   7, 3, 7, 3,   4, 3, 0,   0, 0 }, // preset 3
-    { 0, 0,   4, 5, 4, 4,   2, 2, 2,   0, 0 }, // preset 4
-    { 0, 0,   6, 6, 4, 4,   3, 2, 0,   0, 0 }, // preset 5
-    { 0, 0,   5, 6, 4, 2,   2, 0, 0,   0, 0 }, // preset 6
-    { 0, 0,   6, 8, 4, 5,   4, 3, 3,   0, 0 }, // preset 7
-    { 0, 0,   8, 0, 3, 0,   0, 0, 0,   0, 0 }, // preset 8
-    { 8, 8,   8, 8, 8, 8,   8, 8, 8,   8, 0 }, // preset 9
+    { 4, 2,   7, 8, 6, 6,   2, 4, 4,   0, 0, 0 }, // preset 0
+    { 0, 0,   4, 5, 4, 5,   4, 4, 0,   0, 0, 0 }, // preset 1
+    { 0, 0,   4, 4, 3, 2,   2, 2, 0,   0, 0, 0 }, // preset 2
+    { 0, 0,   7, 3, 7, 3,   4, 3, 0,   0, 0, 0 }, // preset 3
+    { 0, 0,   4, 5, 4, 4,   2, 2, 2,   0, 0, 0 }, // preset 4
+    { 0, 0,   6, 6, 4, 4,   3, 2, 0,   0, 0, 0 }, // preset 5
+    { 0, 0,   5, 6, 4, 2,   2, 0, 0,   0, 0, 0 }, // preset 6
+    { 0, 0,   6, 8, 4, 5,   4, 3, 3,   0, 0, 0 }, // preset 7
+    { 0, 0,   8, 0, 3, 0,   0, 0, 0,   0, 0, 0 }, // preset 8
+    { 8, 8,   8, 8, 8, 8,   8, 8, 8,   8, 0, 0 }, // preset 9
 };
 
 // some ugly globals, fn pointer, etc.
@@ -131,21 +133,22 @@ static int ui_presets = PRESETS_0;
 
 
 static void ui_set_volumes_0( void ) {
-  tg_vol[0]     = ui_draw[0]  * ui_draw[0] / 64.0;
-  tg_vol[2]     = ui_draw[1]  * ui_draw[1] / 64.0;
-  tg_vol[3]     = ui_draw[2]  * ui_draw[2] / 64.0;
+  tg_vol[0]     = ui_draw[0] * ui_draw[0] / 64.0;
+  tg_vol[2]     = ui_draw[1] * ui_draw[1] / 64.0;
+  tg_vol[3]     = ui_draw[2] * ui_draw[2] / 64.0;
   // the mixture draw controls four stops
   tg_vol[4]     =
   tg_vol[5]     =
   tg_vol[6]     =
-  tg_vol[8]     = ui_draw[3]  * ui_draw[3] / 64.0;
+  tg_vol[8]     = ui_draw[3] * ui_draw[3] / 64.0;
   // three voices
-  tg_vol_fl     = ui_draw[4]  * ui_draw[4] / 64.0;
-  tg_vol_rd     = ui_draw[5]  * ui_draw[5] / 64.0;
-  tg_vol_sh     = ui_draw[6]  * ui_draw[6] / 64.0;
-  // two effects
+  tg_vol_fl     = ui_draw[4] * ui_draw[4] / 64.0;
+  tg_vol_rd     = ui_draw[5] * ui_draw[5] / 64.0;
+  tg_vol_sh     = ui_draw[6] * ui_draw[6] / 64.0;
+  // threeo effects
   tg_percussion = ui_draw[7] / 8.0;
   tg_vibrato    = ui_draw[8] / 8.0;
+  tg_reverb     = ui_draw[9] / 8.0;
 }
 
 static void ui_set_volumes_1( void ) {
@@ -153,9 +156,10 @@ static void ui_set_volumes_1( void ) {
   for ( int i = 0; i < STOPS_1; i++ ) {
     tg_vol[i] = ui_draw[i] * ui_draw[i] / 64.0;
   }
-  // two effects
+  // three effects
   tg_percussion = ui_draw[STOPS_1] / 8.0;
   tg_vibrato    = ui_draw[STOPS_1+1] / 8.0;
+  tg_reverb     = ui_draw[STOPS_1+2] / 8.0;
   // only sine waves
   tg_vol_fl     = 1.0;
   tg_vol_rd     = 0.0;
@@ -269,9 +273,9 @@ static void ui_set_kbd( keybd_t kbd ) {
 
 
 // explain the user interface
-static void print_help(  ) {
+static void print_help( const char *name ) {
   printf( "\n\n\n\n\n" );
-  printf( "  connie %s (%s)\n\n", connie_version, connie_name );
+  printf( "  %s: %s (%s)\n\n", name, connie_version, connie_name );
   printf( "  [ESC]\t\t\t\t\tQUIT\n  [SPACE]\t\t\t\tPANIC\n" );
   printf( "  %c%c%c%c%c%c... and %c%c%c%c%c%c... \t\tStops\n  ", 
           kbd_translate( 'Q' ), kbd_translate( 'W' ),
@@ -364,7 +368,7 @@ static int kbhit()
 // simple "gui" control
 // ********************
 //
-void ui( const int connie_model, const keybd_t kbd ) {
+void ui( const char *name, const int connie_model, const keybd_t kbd ) {
 
   struct termios t;
   // get term status
@@ -418,7 +422,7 @@ void ui( const int connie_model, const keybd_t kbd ) {
     } 
     if ( ui_value_changed ) {
       ui_set_volumes();
-      print_help();
+      print_help( name );
       print_status();
       ui_value_changed = 0;
     } else {

@@ -28,5 +28,5 @@
 typedef enum keybd_enum { QWERTY=0, QWERTZ, AZERTY } keybd_t;
 
 extern int ui_set_program( int prog );
-extern void ui( const int connie_model, const keybd_t keybd );
+extern void ui( const char *name, const int connie_model, const keybd_t keybd );
 

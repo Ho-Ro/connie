@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH CONNIE 1 "June 24, 2009"
+.TH CONNIE 1 "June 28, 2009"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -34,6 +34,9 @@ polyphonic analog organ. It's a jack client with midi in and audio out.
 .B -a
 autoconnect to system:playback ports 
 .TP
+.B -c CHN
+select MIDI channel 1..16, 0=all (default)
+.TP
 .B -f
 use french AZERTY keyboard 
 .TP
@@ -42,6 +45,9 @@ use german QWERTZ keyboard
 .TP
 .B -h
 show help
+.TP
+.B -p FRQ
+set concert pitch 220..880 Hz 
 .TP
 .B -t NUM
 select organ type: 
@@ -53,5 +59,5 @@ show version
 .SH AUTHOR
 connie was written by Martin Homuth-Rosemann.
 .PP
-This manual page was written by Martin Homuth-Rosemann <linuxaudio@cryptomys.de>,
+This manual page was written by Martin Homuth-Rosemann <homuth-rosemann@cryptomys.de>,
 for the Debian project (and may be used by others).

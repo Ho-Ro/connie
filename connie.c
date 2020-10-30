@@ -39,10 +39,10 @@
 #include <jack/midiport.h>
 
 #include "connie_ui.h"
+#include "freeverb.h"
 
-
-const char * connie_version = "0.4.1";
-const char * connie_name = "summer in the city";
+const char * connie_version = "0.4.2";
+const char * connie_name = "when the music's over";
 
 
 
@@ -50,9 +50,6 @@ const char * connie_name = "summer in the city";
 //            <USER TUNABLE PART>           //
 //////////////////////////////////////////////
 //
-// tune the instrument
-const float concert_pitch_440 = 440.0;
-
 // "size of the instrument"
 #define OCTAVES 5
 #define LOWNOTE 24
@@ -113,7 +110,6 @@ static sample_t *tg_cycle_sh[ OCT_SAMP ];
 // samples in cycle
 static jack_nframes_t tg_sam_in_cy;
 
-
 // table with frequency of each midi note
 static float tg_midi_freq[MIDI_MAX];
 
@@ -141,6 +137,8 @@ int midi_prog = 0;
 float tg_vibrato   = 0;
 // percussion intensity
 float tg_percussion = 0;
+// reverb intensity
+float tg_reverb = 0;
 
 // stops
 float tg_vol[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -152,6 +150,12 @@ float tg_vol_sh  = 0;
 
 // master volume
 float tg_master_vol = 0.25;
+
+// midi channel 1..16, or 0=all
+int tg_midi_channel = 0;
+
+
+
 
 
 // 
@@ -230,73 +234,47 @@ static sample_t getsample( unsigned int tone, unsigned int octave ) {
 }
 
 
-
-// ********************
+// ******************************************
 // our realtime process
-// ********************
+//
+// process midi input and create audio output
+// ******************************************
 //
 static int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
 
   // freq modulation for vibrato
   static float shift_offset = 0;
 
-  // process midi events
-  // *******************
-  // (inspired from fluidjack.c from Nedko Arnaudov)
-  //
-  jack_nframes_t event_count;
-  jack_midi_event_t event;
-
-  // grab our midi input buffer
-  void * midi_buffer = jack_port_get_buffer( jack_midi_port, nframes );
-  // check for events and process them (ignore event time)
-  // TODO: process note on/off events at timer intervall
-  event_count = jack_midi_get_event_count( midi_buffer );
-  for ( jack_nframes_t iii=0; iii < event_count; iii++ ) {
-    jack_midi_event_get( &event, midi_buffer, iii );
-    //printf( "%d: %d 0x%2X, 0x%2X\n", 
-    //        event.time, event.size, event.buffer[0], event.buffer[1] );
-    if ( event.size == 3 ) { // noteon, noteoff, cc
-      int note;
-      if ( ( event.buffer[0] >> 4 ) == 0x08 ) { // note_off note vol
-        note = event.buffer[1];
-        midi_vol_raw[note]=0;
-      } else if ( ( event.buffer[0] >> 4 ) == 0x09 ) {// note_on note vol
-        note = event.buffer[1];
-        if ( event.buffer[2] )
-          midi_vol_raw[note] = 64;
-        else
-          midi_vol_raw[note] = 0;
-      } else if ( ( event.buffer[0] >> 4 ) == 0x0B ) {// cc num val
-          int cc = event.buffer[1];
-          midi_cc[cc] = event.buffer[2];
-          if ( cc == 7 ) {
-            tg_master_vol = event.buffer[2] * event.buffer[2] / 127.0 / 127.0;
-          } else if ( 120 == cc || 123 == cc ) { // all sounds/notes off
-            tg_panic();
-          }
-      } else if ( ( event.buffer[0] >> 4 ) == 0x0E ) {// pitch wheel
-        midi_pitch = 128 * event.buffer[2] + event.buffer[1] - 0x2000;
-      }
-    } else if ( event.size == 2 ) { // prog change
-      if ( ( event.buffer[0] >> 4 ) == 0x0C ) { // prog change
-        midi_prog = event.buffer[1];
-        ui_set_program( midi_prog );
-      }
-    }
-  } // for
-
-
-  // create audio output
-  // *******************
-  //
   // sampling position
   int pos;
   // voice samples 
-  sample_t sample;
-  float shift;
-
+  sample_t sample[2];
+  // vibrato fm
+  float shift; 
+  // attac/decay/release
   static int timer = 0;
+
+  // midi events
+  // ***********
+  //
+  jack_nframes_t event_count = 0;
+  jack_nframes_t event_index = 0;
+  jack_midi_event_t in_event;
+  in_event.time = 0xFFFF; // invalid
+
+  // track the freeverb parameter
+  if ( freeverbWet != tg_reverb ) {
+    freeverbWet = tg_reverb;
+    freeverbSetParam();
+  }
+
+  // grab our midi input buffer
+  void * midi_buffer = jack_port_get_buffer( jack_midi_port, nframes );
+  event_count = jack_midi_get_event_count( midi_buffer );
+  if ( event_count > 0 ) { // get the first event
+    //printf("%d event(s)\n", event_count);
+    jack_midi_event_get( &in_event, midi_buffer, 0 );
+  }
 
   // grab our audio output buffer 
   sample_t *out_l = (sample_t *) jack_port_get_buffer (jack_audio_port_l, nframes);
@@ -305,6 +283,48 @@ static int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
   // fill the buffer
   // this implements the signal flow of an electronic organ
   for ( jack_nframes_t frame = 0; frame < nframes; frame++ ) {
+
+    // process the actual midi in_events ( can be >1 at the same time!)
+    while ( (event_index < event_count ) && (in_event.time <= frame) ) {
+      // tg_midi_channel = 0: all channels, or 1..16
+      if ( 0 == tg_midi_channel || tg_midi_channel-1 ==  ( *(in_event.buffer) & 0xF ) ) {
+        //printf( "  %d: %d %d 0x%2X, 0x%2X\n", 
+        //      event_index, in_event.time, in_event.size, in_event.buffer[0], in_event.buffer[1] );
+        if ( in_event.size == 3 ) { // noteon, noteoff, cc
+          int note;
+          if ( ( in_event.buffer[0] >> 4 ) == 0x08 ) { // note_off note vol
+            note = in_event.buffer[1];
+            midi_vol_raw[note]=0;
+          } else if ( ( in_event.buffer[0] >> 4 ) == 0x09 ) {// note_on note vol
+            note = in_event.buffer[1];
+            if ( in_event.buffer[2] )
+              midi_vol_raw[note] = 64;
+            else
+              midi_vol_raw[note] = 0;
+          } else if ( ( in_event.buffer[0] >> 4 ) == 0x0B ) {// cc num val
+              int cc = in_event.buffer[1];
+              midi_cc[cc] = in_event.buffer[2];
+              if ( cc == 7 ) {
+                tg_master_vol = in_event.buffer[2] * in_event.buffer[2] / 127.0 / 127.0;
+              } else if ( 120 == cc || 123 == cc ) { // all sounds/notes off
+                tg_panic();
+              }
+          } else if ( ( in_event.buffer[0] >> 4 ) == 0x0E ) {// pitch wheel
+            midi_pitch = 128 * in_event.buffer[2] + in_event.buffer[1] - 0x2000;
+          }
+        } else if ( in_event.size == 2 ) { // prog change
+          if ( ( in_event.buffer[0] >> 4 ) == 0x0C ) { // prog change
+            midi_prog = in_event.buffer[1];
+            ui_set_program( midi_prog );
+          }
+        } // if ( in_event.size ... )
+      } // if ( tg_midi_channel )
+      // events pending?
+      if ( ++event_index < event_count ) {
+        jack_midi_event_get( &in_event, midi_buffer, event_index );
+      }
+    } // while ( (event_index < event_count) && ... )
+
 
     // shifting the pitch and volume for (simple) leslie sim
     // shift is a sin signal used for fm and am
@@ -317,19 +337,21 @@ static int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
     else
       shift = 0.0;
 
+    // process the keys (attac/decay/release), do stop mixture
     if ( ++timer > tg_sample_rate / 4000 ) { // 4 kHz -> every 250us
       timer = 0;
       int *p_vol = tg_vol_key + LOWNOTE; // tg_vol_key[note]
       int *p_raw = midi_vol_raw + LOWNOTE;
+
       // ramp the midi volumes up/down to remove the clicking at key press/release
       for ( int note = LOWNOTE; note < HIGHNOTE; note++, p_vol++, p_raw++ ) {
         if ( *p_vol < *p_raw ) {
-          if ( tg_percussion ) // attack immediate up to 64..192
-            (*p_vol) = 64 + 128 * tg_percussion; // decay to 64 (0..48 ms)
+          if ( tg_percussion ) // attack immediate up to 0..256
+            (*p_vol) = 256 * tg_percussion; // then decay to 64 (0..48 ms)
           else
-            (*p_vol) += 8; // quick up (2 ms)
+            (*p_vol) += 8; // attac quick up (2 ms)
         } else if ( *p_vol > *p_raw ) {
-          (*p_vol)--; // release slow down (16 ms)
+          (*p_vol)--; // decay/release slow down (16 ms)
         }
       } // for ( note )
 
@@ -380,14 +402,14 @@ static int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
 
     // polyphonic output with drawbars tg_vol_xx
     //
-    sample = 0.0;
+    sample[0] = 0.0;
 
     int note = LOWNOTE;
     for ( int octave = 0; octave < OCT_MIX; octave++ ) {
       for ( int tone = 0; tone < 12; tone++, note++ ) {
         int vol = tg_vol_note[note];
         if ( vol ) { // note actually playing
-          sample += vol * getsample( tone, octave );
+          sample[0] += vol * getsample( tone, octave );
         } // if ( vol )
       } // for ( tone )
     } // for ( octave )
@@ -411,14 +433,15 @@ static int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
     // tg_vol_16, tg_vol_8, tg_vol_4, tg_vol_IV, tg_vol_fl, tg_vol_rd and tg_vol_sh: range 0..64
     // tg_vol_key  
     // allow summing of multiple keys, stops, voices without hard limiting
-    sample *= 0.1 * tg_master_vol / ( 64 );
+    sample[0] *= clip( 0.1 * tg_master_vol / 64 );
 
-    // soft clipping, leave 20% headroom for leslie am
-    sample = 1.2 * clip( sample );
 
     // TODO: adjust value of leslie am index
-    out_l[frame] = sample * (1.0f - shift / 5); // 20% (?) am for "leslie"
-    out_r[frame] = sample * (1.0f + shift / 5); // "
+    sample[1] = sample[0] * (1.0f + shift / 5); // 20% (?) am for "leslie"
+    sample[0] *= (1.0f - shift / 5); // "
+    freeverbComputeOne( sample );
+    out_l[frame] = sample[0];
+    out_r[frame] = sample[1];
 
   } // for ( frame )
 
@@ -430,7 +453,7 @@ static int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
 
 // callback if sample rate changes
 static int jack_srate_cb( jack_nframes_t nframes, void *arg ) {
-  printf( "the sample rate is now %lu/sec\n", (unsigned long)nframes );
+  printf( "connie: JACK sample rate is now %lu/sec\n", (unsigned long)nframes );
   tg_sample_rate = nframes;
   return 0;
 }
@@ -439,7 +462,7 @@ static int jack_srate_cb( jack_nframes_t nframes, void *arg ) {
 
 // callback in case of error
 static void jack_error_cb( const char *desc ) {
-  fprintf( stderr, "JACK error: %s\n", desc );
+  fprintf( stderr, "connie: JACK error %s\n", desc );
   exit( 1 );
 }
 
@@ -447,7 +470,7 @@ static void jack_error_cb( const char *desc ) {
 
 // callback at jack shutdown
 static void jack_shutdown_cb( void *arg ) {
-  fprintf( stderr, "JACK shutdown\n" );
+  fprintf( stderr, "connie: JACK shutdown\n" );
   exit( 1 );
 }
 
@@ -539,15 +562,26 @@ int main( int argc, char *argv[] ) {
 
 
   int c;
+  int channel = 0;
   int autoconnect = 0;
   int printhelp = 0;
   keybd_t keybd = QWERTY;
   int connie_model = 0;
+
+// tune the instrument
+  float concert_pitch = 440.0;
+
+
   opterr = 0;
-  while ((c = getopt (argc, argv, "afght:v")) != -1) {
+  while ((c = getopt (argc, argv, "ac:fghp:t:v")) != -1) {
     switch (c) {
       case 'a':
         autoconnect = 1;
+        break;
+      case 'c':
+        channel = atoi( optarg );
+        if ( channel >= 0 && channel <= 16 )
+          tg_midi_channel = channel;
         break;
       case 'f':
         keybd = AZERTY;
@@ -558,14 +592,21 @@ int main( int argc, char *argv[] ) {
       case 'h':
         printhelp = 1;
         break;
+      case 'p':
+        concert_pitch = atof( optarg );
+        if ( concert_pitch < 220 || concert_pitch > 880 )
+          concert_pitch = 440.0;
+        //printf( "concert pitch = %5.1f Hz\n", concert_pitch );
+        break;
       case 't':
         connie_model = atoi( optarg );
+        //printf( "connie model %d\n", connie_model );
         break;
       case 'v':
         printf( "connie %s (%s)\n", connie_version, connie_name );
         exit( 0 );
       case '?':
-        if ( optopt == 't' ) 
+        if ( 'p' == optopt || 't' == optopt ) 
           fprintf (stderr, "Option `-%c' requires an numeric argument.\n", optopt);          
         else if (isprint (optopt))
           fprintf (stderr, "Unknown option `-%c'.\n", optopt);
@@ -580,70 +621,72 @@ int main( int argc, char *argv[] ) {
   if ( printhelp ) {
     printf( "connie [opts]\n" );
     printf( "  -a\t\tautoconnect to system:playback ports\n" );
+    printf( "  -c CHAN\tMIDI channel (1..16), 0=all (default)\n" );
     printf( "  -f\t\tfrench AZERTY keyboard\n" );
     printf( "  -g\t\tgerman QWERTZ keyboard\n" );
     printf( "  -h\t\tthis help msg\n" );
+    printf( "  -p FREQ\tconcert pitch 220..880 Hz\n" );
     printf( "  -t TYP\t0: connie (default), 1: test\n" );
     printf( "  -v\t\tprint version\n" );
     exit( 1 );
   }
-  // printf( "keybd = %d, connie_model = %d\n", keybd, connie_model );
-  // exit( 0 );
-  /*
-   ******************************************************
-   * For more info about writing a JACK client look at: *
-   *  http://dis-dot-dat.net/index.cgi?item=jacktuts/   *
-   ******************************************************
-   */
+  //
+  // ******************************************************
+  // * For more info about writing a JACK client look at: *
+  // *  http://dis-dot-dat.net/index.cgi?item=jacktuts/   *
+  // ******************************************************
+  //
  
-  /* tell the JACK server to call error_cb() whenever it
-     experiences an error.  Notice that this callback is
-     global to this process, not specific to each client.
+  // tell the JACK server to call error_cb() whenever it
+  // experiences an error.  Notice that this callback is
+  // global to this process, not specific to each client.
 
-     This is set here so that it can catch errors in the
-     connection process
-  */
+  // This is set here so that it can catch errors in the
+  // connection process
+
   jack_set_error_function( jack_error_cb );
 
-
-  /* try to become a client of the JACK server */
+  // try to become a client of the JACK server
 
   if ( (jack_client = jack_client_open( jack_name, 0, NULL ) ) == 0 ) {
     fprintf( stderr, "jack server not running?\n" );
     return 1;
   }
 
+  // get the individual name
+  jack_name = jack_get_client_name( jack_client );
 
-  /* tell the JACK server to call `rt_process_cb()' whenever
-     there is work to be done.
-  */
+  // tell the JACK server to call `rt_process_cb()' whenever
+  // there is work to be done.
+
   jack_set_process_callback( jack_client, rt_process_cb, 0 );
 
 
-  /* tell the JACK server to call `srate_cb()' whenever
-     the sample rate of the system changes.
-  */
+  // tell the JACK server to call `srate_cb()' whenever
+  // the sample rate of the system changes.
+
   jack_set_sample_rate_callback( jack_client, jack_srate_cb, 0 );
 
 
-  /* tell the JACK server to call `jack_shutdown_cb()' if
-     it ever shuts down, either entirely, or if it
-     just decides to stop calling us.
-  */
+  // tell the JACK server to call `jack_shutdown_cb()'
+  // if it ever shuts down, either entirely, or if it
+  // just decides to stop calling us.
+
   jack_on_shutdown( jack_client, jack_shutdown_cb, 0 );
 
 
-  /* display the current sample rate. once the client is activated 
-     (see below), you should rely on your own sample rate
-     callback (see above) for this value.
-  */
+  // display the current sample rate. once the client is activated 
+  // (see below), you should rely on your own sample rate
+  // callback (see above) for this value.
+
   tg_sample_rate = jack_get_sample_rate( jack_client );
   printf( "sample rate: %lu/sec\n", (unsigned long)tg_sample_rate );
 
 
-  // build list of et midi frequencies starting from lowest C (note 0)
+  // build list of eq. tuned midi frequencies starting from lowest C (note 0)
   // (three halftones above the very low A six octaves down from a' 440 Hz)
-  float f = concert_pitch_440 / 64 * tg_halftone * tg_halftone * tg_halftone;
+
+  float f = concert_pitch / 64 * tg_halftone * tg_halftone * tg_halftone;
 
   for ( int midinote = 0; midinote < 128; midinote++ ) {
     tg_midi_freq[ midinote ] = f;
@@ -687,10 +730,10 @@ int main( int argc, char *argv[] ) {
     exit( 1 );
   }
 
+
   printf( "Preparing the voices" );
   // and fill it up with one period of sine wave
   // maybe a RC filtered square wave sounds more natural
-  // the vox continental uses a 3-4-5-8 mixture
   for ( int i=0; i < tg_sam_in_cy; i++ ) {
     tg_cycle_fl[i] = sinf( i * scale ); // flute
   }
@@ -707,6 +750,10 @@ int main( int argc, char *argv[] ) {
       tg_cycle_sh[ oct][ i ] = saw_bl( i * scale, 1, partials ); // sharp
     }
   }
+
+  freeverbInit( tg_sample_rate );
+  freeverbSetParam();
+
   puts("");
 
   // create one midi and two audio ports
@@ -724,13 +771,12 @@ int main( int argc, char *argv[] ) {
   // exit cleanly
   atexit( connie_tg_shutdown );
 
-// autoconnect if cmd line option
+  // autoconnect if cmd line option
   if ( autoconnect ) {
     // autoconnect to system playback port
     const char **jack_ports, **pp;
-    /* connect the ports*/
     if ( ( jack_ports = jack_get_ports( jack_client, NULL, NULL, JackPortIsPhysical|JackPortIsInput ) ) == NULL) {
-      fprintf( stderr, "cannot find any physical playback ports\n" );
+      fprintf( stderr, "connie: cannot find any physical playback ports\n" );
       exit(1);
     }
     pp = jack_ports; 
@@ -743,7 +789,8 @@ int main( int argc, char *argv[] ) {
     free( jack_ports );
   }
 
-  ui( connie_model, keybd );
+  ui( jack_name, connie_model, keybd );
+
   // connie_shutdown() called via atexit()
 
   exit( 0 );

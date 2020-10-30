@@ -1,23 +1,30 @@
-# for debin packager
+# for debian packager
 BIN=$(DESTDIR)/usr/bin
 MAN=$(DESTDIR)/usr/share/man/man1
 
+
+CFLAGS=-Wall -std=c99 -O3 -march=pentium3 -msse -mfpmath=sse -ffast-math -fomit-frame-pointer -pipe
 
 TARGETS=connie
 
 all: $(TARGETS)
 
-connie: connie.o connie_ui.o
-	gcc $(LDFLAGS) -o connie connie.o connie_ui.o -ljack
 
-connie.o: connie.c connie_ui.h
-	gcc -c -Wall -std=c99 --fast-math -o connie.o connie.c
+connie: connie.o connie_ui.o freeverb.o
+	gcc $(LDFLAGS) -o connie connie.o connie_ui.o freeverb.o -ljack
+
+connie.o: connie.c connie_ui.h freeverb.h
+	gcc -c $(CFLAGS) -o connie.o connie.c
+
+freeverb.o: freeverb.c freeverb.h
+	gcc -c $(CFLAGS) -o freeverb.o freeverb.c
 
 connie_ui.o: connie_ui.c connie.h connie_tg.h connie_ui.h
-	gcc -DCONNIE -c -Wall -std=c99 --fast-math -o connie_ui.o connie_ui.c
+	gcc -DCONNIE -c $(CFLAGS) -o connie_ui.o connie_ui.c
+
 
 clean:
-	rm -f *~ *.o $(TARGETS)
+	rm -f *~ .*~ *.o $(TARGETS)
 
 distclean: clean
 	rm build-stamp configure-stamp
