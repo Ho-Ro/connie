@@ -1,5 +1,16 @@
-connie (0.4.2) experimental; urgency=low
+connie (0.4.3-rc6) experimental; urgency=low
+  * prepared for jack-session 
+  * JCRev type reverb uses less cpu
+  * default hammond gear ratio intonation
+  * opt. intonations inspired by aeolus
+  * colored "gui"
+  * some DSP optimizations, better denormal handling
+  * smoother attack/decay envelopes
+  * percussion triggered by first keypress only
 
+ -- Martin Homuth-Rosemann <homuth-rosemann@cryptomys.de>  Tue, 3 Aug 2010 21:39:00 +0200
+
+connie (0.4.2) experimental; urgency=low
 
   * Second organ model, i18n, source code modularization - see Changelog 
 

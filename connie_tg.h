@@ -5,7 +5,7 @@
  *   Simulation of an electronic organ like Vox Continental
  *   with JACK MIDI input and JACK audio output
  *
- *   Copyright (C) 2009 Martin Homuth-Rosemann
+ *   Copyright (C) 2009,2010 Martin Homuth-Rosemann
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -21,7 +21,8 @@
  *   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
  *****************************************************************************/
-
+#ifndef CONNIE_TG_H
+#define CONNIE_TG_H
 
 // stops
 extern float tg_vol[9];
@@ -47,3 +48,4 @@ extern float tg_reverb;
 extern void tg_panic( void );
 
 
+#endif

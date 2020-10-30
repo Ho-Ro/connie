@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH CONNIE 1 "June 28, 2009"
+.TH CONNIE 1 "September 26, 2010"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -16,7 +16,7 @@
 .\" .sp <n>    insert n+1 empty lines
 .\" for manpage-specific macros, see man(7)
 .SH NAME
-connie \- electronic organ like e.g. Vox Continental
+connie \- emulation of an electronic organ like e.g. Vox Continental
 .SH SYNOPSIS
 .B connie [options]
 .SH DESCRIPTION
@@ -27,14 +27,36 @@ command.
 .\" TeX users may be more comfortable with the \fB<whatever>\fP and
 .\" \fI<whatever>\fP escape sequences to invode bold face and italics,
 .\" respectively.
+.nf
 \fBconnie\fP is a program that simulates the signal flow of an old 
-polyphonic analog organ. It's a jack client with midi in and audio out.
+polyphonic analog organ. It's a jack client with one midi in 
+and two audio out ports. 
+.sp
+Two binaries are supplied:
+\fBconnie_i386\fP runs on every i386 processor, 
+\fBconnie_sse\fP is optimized for PIII processor (or better) with sse unit.
+The wrapper script \fBconnie\fP selects the appropriate binary at runtime.
+.sp
+Two instruments are available, selected by program option "-i NUM".
+\fB-i0\fP selects an organ like "Vox Continental", 
+\fB-i1\fP selects a "Poor-Man's-Hammond". 
+The continental type has four stops (8", 4", 2" and mixture) and three 
+voices (flute=sine, reed=rect and sharp=sawtooth).
+The P-M-H has the nine well known stops but only one voice (sine).
+Both instruments have tunable percussion, vibrato and reverb effects.
+A text based user interface shows drawbars for the stops and effects.
+They can be manipulated by typing unshifted or shifted character keys.
+On a standard QWERTY keyboard "Q" moves the first drawbar up, "A" down,
+"W"/"S" moves the second drawbar, "E"/"D" moves the third etc. 
+Option \fB-f\fP selects french (AZERTY) and \fB-g\fP selects german (QWERTZ) layout.
+Number keys 0..9 select ten predefined presets.
+\fB<SPACE>\fP acts as a panic key and \fB<ESC>\fP quits the program (after asking).
 .SH OPTIONS
 .TP
 .B -a
 autoconnect to system:playback ports 
 .TP
-.B -c CHN
+.B -c CHANNEL
 select MIDI channel 1..16, 0=all (default)
 .TP
 .B -f
@@ -46,18 +68,42 @@ use german QWERTZ keyboard
 .B -h
 show help
 .TP
-.B -p FRQ
+.B -i INSTRUMENT
+select organ model: 
+  0 = connie (default),
+  1 = poor-man's-hammond
+.TP
+.B -m MIDI_PORT
+connect to jack midi port
+.TP
+.B -p FREQUENCY
 set concert pitch 220..880 Hz 
 .TP
-.B -t NUM
-select organ type: 
-0 = connie (default),
-1 = test
+.B -s SCALE
+select intonation scale
+  0 = Equally Tempered
+  1 = Hammond Gears (default)
+  2 = Pure Intonation
+  3 = Pythagorean
+  4 = Meantone 1/4
+  5 = Werckmeister III
+  6 = Kirnberger III
+.TP
+.B -t SEMI
+transpose -12..+12 semitones
 .TP
 .B -v
 show version
+.TP
+.B -C configfile
+load config file
+.TP
+.B -U UUID
+set jack session UUID
 .SH AUTHOR
-connie was written by Martin Homuth-Rosemann.
+.nf
+The program connie was written by Martin Homuth-Rosemann.
 .PP
-This manual page was written by Martin Homuth-Rosemann <homuth-rosemann@cryptomys.de>,
+This manual page was written by Martin Homuth-Rosemann
 for the Debian project (and may be used by others).
+

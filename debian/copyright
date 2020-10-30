@@ -6,7 +6,7 @@ It was downloaded from: http://cryptomys.de/horo/Connie
 
 Upstream Author:
 
-    Copyright (C) 2009 Martin Homuth-Rosemann
+    Copyright (C) 2009,2010 Martin Homuth-Rosemann
 
 License:
     This package is free software; you can redistribute it and/or modify
@@ -28,8 +28,8 @@ Public License version 2 can be found in `/usr/share/common-licenses/GPL-2'.
 
 The Debian packaging is:
 
-    Copyright (C) 2009 Martin Homuth-Rosemann <homuth-rosemann@cryptomys.de>
+    Copyright (C) 2009,2010 Martin Homuth-Rosemann <homuth-rosemann@cryptomys.de>
 
-and is licensed under the GPL version 3, 
-see `/usr/share/common-licenses/GPL-3'.
+and is licensed under the GPL version 2, 
+see `/usr/share/common-licenses/GPL-2'.
 

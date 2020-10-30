@@ -1,2 +1,0 @@
-shlibs:Depends=libc6 (>= 2.3), libjack0 (>= 0.116.2+svn3592)
-misc:Depends=

@@ -5,7 +5,7 @@
  *   Simulation of an electronic organ like Vox Continental
  *   with JACK MIDI input and JACK audio output
  *
- *   Copyright (C) 2009 Martin Homuth-Rosemann
+ *   Copyright (C) 2009,2010 Martin Homuth-Rosemann
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -21,7 +21,21 @@
  *   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
  *****************************************************************************/
+#ifndef CONNIE_H
+#define CONNIE_H
+
+typedef enum {CONNIE, HAMMOND} model_t;
 
 extern const char * connie_version;
-extern const char * connie_name;
+//extern const char * connie_name;
 
+extern char *jack_name;
+extern float concert_pitch;
+extern int intonation;
+extern const char *inton_name;
+extern int transpose;
+extern int tg_midi_channel;
+extern char *uuid;
+extern char *connie_conf;
+
+#endif

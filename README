@@ -3,15 +3,8 @@ Connie
 Simulation of an electronic organ like Vox Continental
 with JACK MIDI input and JACK audio output
 
-Copyright (C) 2009 Martin Homuth-Rosemann
+Copyright (C) 2009, 2010 Martin Homuth-Rosemann
+
 Released under GPL2
 
-
-Roadmap
-planned for ver 0.5:
-- midi cc interface for drawbars 
-- config file
-- program
-planned for ver 0.6:
-- two manuals and pedal
 

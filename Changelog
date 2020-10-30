@@ -1,3 +1,33 @@
+2010-08-03
+connie 0.4.3-rc6 (long time gone)
+removed freeverb and added a JCRev style reverb (less cpu usage).
+http://ccrma.stanford.edu/~jos/pasp/Schroeder_Reverberator_called_JCRev.html
+DSP optimization, denormal handling
+smoother attacK/decay envelopes
+percussion triggered by first keypress only
+diffent intonations
+source code clean up
+two binaries: connie (i386) and connie_sse (>= PIII with sse unit)
+changed program options:
+  -a			autoconnect to system:playback ports
+  -c CHANNEL		MIDI channel (1..16), 0=all (default)
+  -f			french AZERTY keyboard
+  -g			german QWERTZ keyboard
+  -h			this help msg
+  -i INSTRUMENT		0: connie (default), 1: poor-man's-hammond
+  -m MIDI_PORT		connect with midi port
+  -p PITCH		concert pitch 220..880 Hz
+  -s INTONATION_SCALE	 0: Hammond Gears
+			 1: Equally Tempered
+			 2: Pure Intonation
+			 3: Pythagorean
+			 4: ¼ Comma Meantone
+			 5: Werckmeister III
+			 6: Kirnberger III
+  -t TRANSPOSE		transpose -12..+12 semitones
+  -v			print version
+
+
 2009-09-20
 connie 0.4.2 (when the music's over)
 MIDI in event handling at frame level instead of start of whole buffer.
