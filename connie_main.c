@@ -646,7 +646,7 @@ static void tg_init( int tg_sample_rate )
 
   // build a list of intonation frequencies
   // alternative tunings are possible
-  for ( int midinote = 0; midinote < 128; midinote++ ) {
+  for ( int midinote = 0; midinote < MIDI_MAX; midinote++ ) {
     int tone = midinote % 12; // C, C#, D,..., B
     int fmult = 1 << (midinote / 12); // doubles every octave
     float f = scales[intonation].f_ratio[ tone ] * low_C * fmult;
@@ -655,8 +655,10 @@ static void tg_init( int tg_sample_rate )
     feq *= tg_halftone;
     midi_vol_raw[ midinote ] = 0;
     tg_vol_key[ midinote ] = 0;
-    tg_vol_note[ midinote ] = 0;
   } // for ( midinote )
+  for ( int note = 0; note < NOTE_MAX; note++ ) {
+    tg_vol_note[ note ] = 0;
+  }
 
   // set the starting phase of the 12 tones
   for ( int tone = 0; tone < 12; tone++ ) {
