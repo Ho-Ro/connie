@@ -1,3 +1,10 @@
+connie (0.4.4) experimental; urgency=low
+  * resurrected the project after 10 years sleep
+    it still compiles and works under debian buster (stable) without any changes
+  * fixed  "connie_main.c:658:29: warning: iteration 120 invokes undefined behavior..."
+
+ -- Martin Homuth-Rosemann <linuxaudio@cryptomys.de>  Fri, 30 Oct 2020 15:06:07 +0100
+
 connie (0.4.3-rc6) experimental; urgency=low
   * prepared for jack-session 
   * JCRev type reverb uses less cpu

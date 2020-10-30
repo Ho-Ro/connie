@@ -1,3 +1,9 @@
+2020-10-30
+connie 0.4.4 (time is on my side)
+resurrected the project after 10 years sleep,
+it still compiles and works under debian buster (stable) without any changes
+fixed  "connie_main.c:658:29: warning: iteration 120 invokes undefined behavior [-Waggressive-loop-optimizations]"
+
 2010-08-03
 connie 0.4.3-rc6 (long time gone)
 removed freeverb and added a JCRev style reverb (less cpu usage).
