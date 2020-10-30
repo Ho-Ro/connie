@@ -1,6 +1,6 @@
 This package was debianized by:
 
-Martin Homuth-Rosemann <linuxaudio@cryptomys.de> on Wed, 10 Jun 2009 21:29:46 +0200
+Martin Homuth-Rosemann <homuth-rosemann@cryptomys.de> on Wed, 10 Jun 2009 21:29:46 +0200
 
 It was downloaded from: http://cryptomys.de/horo/Connie
 
@@ -28,7 +28,7 @@ Public License version 2 can be found in `/usr/share/common-licenses/GPL-2'.
 
 The Debian packaging is:
 
-    Copyright (C) 2009 Martin Homuth-Rosemann <linuxaudio@cryptomys.de>
+    Copyright (C) 2009 Martin Homuth-Rosemann <homuth-rosemann@cryptomys.de>
 
 and is licensed under the GPL version 3, 
 see `/usr/share/common-licenses/GPL-3'.

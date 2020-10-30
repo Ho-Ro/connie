@@ -7,7 +7,7 @@ connie: connie.c
 	gcc $(CFLAGS) $(LDFLAGS) -Wall -std=c99 --fast-math -o connie -ljack connie.c
 
 clean:
-	rm -f *~
+	rm -f *~ connie
 
 distclean: clean
 	rm connie build-stamp configure-stamp
@@ -19,4 +19,3 @@ install: connie
 uninstall:
 	rm -f $(BIN)/connie 
 	rm -f $(MAN)/connie.1
-

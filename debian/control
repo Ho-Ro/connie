@@ -1,7 +1,7 @@
 Source: connie
 Section: sound
 Priority: optional
-Maintainer: Martin Homuth-Rosemann <linuxaudio@cryptomys.de>
+Maintainer: Martin Homuth-Rosemann <homuth-rosemann@cryptomys.de>
 Build-Depends: debhelper (>= 7),libjack-dev
 Standards-Version: 3.8.1
 Homepage: http://cryptomys.de/horo/Connie

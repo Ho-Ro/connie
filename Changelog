@@ -1,3 +1,21 @@
+2009-06-13
+connie 0.4.0 (land ho!)
+I like this version - it's a big step forward
+Last version "in the cage" used preconfigured mixture samples to 
+reduce cpu load. The fixed freq ratio of 3:4:5:8 led to clean sound 
+suitable for a church pipe organ but not for an analog multiplex organ.
+
+This version combines the mixture from the equal temp. voices with
+the effect of the vivid cutting sound.
+New:
+Three voices: flute=sine, reed=rect (sounds more like vox), sharp=saw
+Percussion added
+Leslie fm parameter reduced - sounds more realistic
+Optimized realtime callback function reduces cpu load.
+Midi cc 120 (all sound off) and 123 (all notes off) recognized
+Midi pitch bend 
+Cmd line argument --autoconnect
+
 2009-06-09
 connie 0.3.2 (in the cage)
 name changed Connie -> connie
