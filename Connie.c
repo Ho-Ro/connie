@@ -33,8 +33,8 @@
 #include <jack/midiport.h>
 
 
-const char * connie_version = "0.2";
-const char * connie_name = "good vibrations";
+const char * connie_version = "0.3";
+const char * connie_name = "house of the rising sun";
 
 // tune the instrument
 const double concert_pitch_440 = 440.0;
@@ -55,7 +55,11 @@ typedef jack_default_audio_sample_t sample_t;
 jack_nframes_t sr;
 
 /*one cycle of our sound*/
-sample_t* cycle;
+sample_t *cycle;
+sample_t  *mixture;
+sample_t *cycle_rd;
+sample_t  *mixture_rd;
+
 /*samples in cycle*/
 jack_nframes_t samincy;
 
@@ -67,6 +71,7 @@ double midi_freq[128];
 double sample_offset[128];
 
 // actual volume of each note
+int midi_vol_raw[128];
 int midi_vol[128];
 
 // actual value of each control
@@ -84,7 +89,7 @@ int vol_mix = 8;
 // voices
 int vol_flute = 8;
 int vol_reed = 0;
-// vibrato on/off (boolean)
+// vibrato 
 int vibrato = 0;
 
 // master volume (volume = 0..127)
@@ -118,10 +123,10 @@ int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
       int note;
       if ( ( event.buffer[0] >> 4 ) == 0x08 ) { // note_off note vol
         note = event.buffer[1];
-        midi_vol[note]=0;
+        midi_vol_raw[note]=0;
       } else if ( ( event.buffer[0] >> 4 ) == 0x09 ) {// note_on note vol
         note = event.buffer[1];
-        midi_vol[note]= event.buffer[2];
+        midi_vol_raw[note]= event.buffer[2];
       } else if ( ( event.buffer[0] >> 4 ) == 0x0B ) {// cc num val
           int cc = event.buffer[1];
           midi_cc[cc] = event.buffer[2];
@@ -156,7 +161,7 @@ int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
 
     // shifting the pitch and volume for (simple) leslie sim
     // shift is a sin signal used for fm and am
-    shift_offset += 10; // shift frequency (int)
+    shift_offset += 2 * vibrato; // shift frequency (int)
     if ( shift_offset >= sr )
       shift_offset -= sr;
     if ( vibrato )
@@ -166,86 +171,60 @@ int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
 
     // polyphonic output with drawbars vol_xx
     // advance the individual sample pointers
-    // use only these notes
-    for ( int note = 24; note <= 108; note++ ) {
-      int vol = midi_vol[note];
-      if ( vol ) { // note actually playing
-        // use square law for drawbar volume
-        // 16' stop (subharmonic)
-        if ( vol_16 ) {
-          if ( note >= 36 ) {
-            value_flute += vol * vol_16 * vol_16 * cycle[ pos=sample_offset[ note-12 ] ];
-            value_reed += vol * vol_16 * vol_16 * ( 1.0 - 2.0 * pos / sr );
+    //
+    int note = 24;
+    for ( int octave = 1; octave <=32; octave *= 2 ) {
+      for ( int tone = 24; tone < 36; tone++, note++ ) {
+        int vol = midi_vol[note];
+        //vol = 64;
+        if ( vol ) { // note actually playing
+          // use square law for drawbar volume
+          // 16' stop (subharmonic)
+          if ( vol_16 && note >= 36) {
+            pos = sample_offset[ tone ] * octave / 2;
+            while ( pos >= sr )
+              pos -= sr;
+            value_flute += vol * vol_16 * vol_16 * cycle[ pos ];
+            value_reed += vol * vol_16 * vol_16 * cycle_rd[ pos ];
           }
-        }
 
-        // 8' stop (unison stop)
-        if ( vol_8 ) {
-          value_flute +=  vol * vol_8 * vol_8 * cycle[ pos=sample_offset[ note ] ];
-          value_reed += vol * vol_8 * vol_8 * ( 1.0 - 2.0 * pos / sr );
-        }
+          // 8' stop (unison stop)
+          if ( vol_8 ) {
+            pos = sample_offset[ tone ] * octave;
+            while ( pos >= sr )
+              pos -= sr;
+            value_flute +=  vol * vol_8 * vol_8 * cycle[ pos ];
+            value_reed += vol * vol_8 * vol_8 * cycle_rd[ pos ];
+          }
 
-        // 4' stop (octave)
-        if ( vol_4 ) {
-          if ( note <=96 ) 
-            pos = sample_offset[ note+12 ];
-          else // repetition 1 octave below
-            pos = sample_offset[ note ];
-          value_flute += vol * vol_4 * vol_4 * cycle[ pos ];
-          value_reed += vol * vol_4 * vol_4 *( 1.0 - 2.0 * pos / sr );
-        }
+          // 4' stop (octave)
+          if ( vol_4 ) {
+            pos = sample_offset[ tone ] * octave * 2;
+            while ( pos >= sr )
+              pos -= sr;
+            value_flute += vol * vol_4 * vol_4 * cycle[ pos ];
+            value_reed += vol * vol_4 * vol_4 * cycle_rd[ pos ];
+          }
 
-        // mixture stop
-        if ( vol_mix ) {
-          // 2 2/3' (octave + fifth)
-          if ( note <= 89 )
-             pos=sample_offset[ note+19 ];
-          else if ( note <= 101 ) // rep 1 oct. below
-             pos=sample_offset[ note+7 ];
-          else // rep 2 oct. below
-             pos=sample_offset[ note-5 ];
-          value_flute += vol * vol_mix * vol_mix * cycle[ pos ];
-          value_reed += vol * vol_mix * vol_mix * ( 1.0 - 2.0 * pos / sr );
-
-          // 2' (super octave)
-          if ( note <= 84 )
-            pos=sample_offset[ note+24 ];
-          else if ( note <= 96 ) // rep 1 oct.
-            pos=sample_offset[ note+12 ];
-          else // rep 2 oct.
-            pos=sample_offset[ note ];
-          value_flute += vol * vol_mix * vol_mix * cycle[ pos ];
-          value_reed += vol * vol_mix * vol_mix * ( 1.0 - 2.0 * pos / sr );
-
-          // 1 3/5' (2 oct. + major third)
-          if ( note <= 80 )
-            pos=sample_offset[ note+28 ];
-          else if ( note <= 92 ) // rep. 1 oct.
-            pos=sample_offset[ note+16 ];
-          else if ( note <= 104 ) // rep 2 oct.
-            pos=sample_offset[ note+4 ];
-          value_flute += vol * vol_mix * vol_mix * cycle[ pos=sample_offset[ note+28 ] ];
-          value_reed += vol * vol_mix * vol_mix * ( 1.0 - 2.0 * pos / sr );
-
-          // 1 1/3' (2 oct. + fifth)
-          // (for 1' like v*x c*ntinental change 77->72 and 31->36)
-          if ( note <= 77 )
-            pos=sample_offset[ note+31 ];
-          else if ( note <= 89 )
-            pos=sample_offset[ note+19 ];
-          else if ( note <= 101 )
-            pos=sample_offset[ note+7 ];
-          else
-            pos=sample_offset[ note-5 ];
-          value_flute += vol * vol_mix * vol_mix * cycle[ pos ];
-          value_reed += vol * vol_mix * vol_mix * ( 1.0 - 2.0 * pos / sr );
-        }
-      }
-
+          // mixture stop
+          if ( vol_mix ) {
+            pos = sample_offset[ tone ] * octave;
+            while ( pos >= sr )
+              pos -= sr;
+            value_flute += vol * vol_mix * vol_mix * mixture[ pos ];
+            value_reed += vol * vol_mix * vol_mix * mixture_rd[ pos ];
+          }
+        } // if ( vol )
+      } // for ( tone )
+    } // for ( octave )
+    for ( note =24; note < 36; note++ ) {
       // advance individual sample pointer, do fm for vibrato
-      sample_offset[note] += ( 1.0 + 0.02 * shift ) * midi_freq[note];
-      if ( sample_offset[note] >= sr )
+      sample_offset[note] += ( 1.0 + 0.02 * shift * vibrato / 8 ) * midi_freq[note];
+      if ( sample_offset[note] >= sr ) { // zero xing
         sample_offset[note] -= sr;
+        for ( int octave = 0; octave < 96; octave += 12 )
+          midi_vol[note+octave] = midi_vol_raw[note+octave]; // change key status at zero xing
+      }
     } // for ( note )
 
     // normalize the output (square law for drawbar volumes)
@@ -289,39 +268,49 @@ void jack_shutdown_cb( void *arg ) {
 
 
 void print_help( void ) {
-  puts( "\n\n\n\n[ESC]\tQuit\t\t[SPACE]\tPanic" );
+  puts( "\n\n\n\n" );
+  puts( "[ESC]\tQuit\t\t[SPACE]\tPanic" );
   puts( "a q\t16' stop\tpull / shift");
   puts( "s w\t 8' stop\tpull / shift");
   puts( "d e\t 4' stop\tpull / shift");
   puts( "f r\tmix stop\tpull / shift");
   puts( "j u\tflute voice\tpull / shift");
   puts( "k i\treed voice\tpull / shift");
-  puts( "v\tvibrato\t\ton/off\n");
+  puts( "l o\tvibrato\t\tpull / shift\n");
 }
 
 
 
 void print_status( void ) {
-  int line;
   printf( "Connie %s (%s)\n", connie_version, connie_name );
   printf( "+---------------------------------+\n" );
   printf( "| 16'  8'  4' mix   fl  rd    vib |\n" );
   printf( "+---------------------------------+\n" );
-  for ( line = 0; line < 8; line++ ) {
+  for ( int line = 0; line < 8; line++ ) {
     printf( "|  %c   %c   %c   %c     %c   %c     %c  |\n", 
   	vol_16>line?'#':' ', vol_8>line?'#':' ', 
   	vol_4>line?'#':' ', vol_mix>line?'#':' ', 
   	vol_flute>line?'#':' ', vol_reed>line?'#':' ', 
-  	vibrato?'#':' ' );
+  	vibrato>line?'#':' ' );
   }
   printf( "+---------------------------------+\n" );
 }
 
+// sawtooth 
+// arg: 0..2 PI
+double saw( double arg ) {
+  while ( arg >= 2 * PI )
+    arg -= 2 * PI;
+    if ( arg < PI )
+      return arg / PI;
+    else
+      return arg / PI - 2.0;
+}
 
 
 int main( int argc, char *argv[] ) {
 
-  char *name = "connie";
+  char *name = "Connie";
 
   if (argc >= 2) {
     name = argv[1];
@@ -392,8 +381,11 @@ int main( int argc, char *argv[] ) {
   sample_t scale = 2 * PI / samincy;
   /*Allocate the space needed to store one cycle*/
   cycle = (sample_t *) malloc( samincy * sizeof( sample_t ) );
+  mixture = (sample_t *) malloc( samincy * sizeof( sample_t ) );
+  cycle_rd = (sample_t *) malloc( samincy * sizeof( sample_t ) );
+  mixture_rd = (sample_t *) malloc( samincy * sizeof( sample_t ) );
  /*Exit if allocation failed (more sense from Jussi)*/
-  if ( cycle == NULL ) {
+  if ( cycle == NULL || mixture == NULL || cycle_rd == NULL || mixture_rd == NULL ) {
     fprintf( stderr,"memory allocation failed\n" );
     return 1;
   }
@@ -402,14 +394,27 @@ int main( int argc, char *argv[] ) {
   // maybe a RC filtered square wave sounds more natural
   for ( int i=0; i < samincy; i++ ) {
     cycle[i] = sin( i * scale ); // sin
+    mixture[i] = sin( 3 * i * scale ) 
+               + sin( 4 * i * scale )
+               + sin( 5 * i * scale )
+               + sin( 6 * i * scale );
+    cycle_rd[i] = saw( i * scale ); // saw
+    mixture_rd[i] = saw( 3 * i * scale ) 
+               + saw( 4 * i * scale )
+               + saw( 5 * i * scale )
+               + saw( 6 * i * scale );
   }
 
   // build list of midi frequencies starting from lowest C (note 0)
   // (three halftones above the very low A six octaves down from a' 440 Hz)
   double f = concert_pitch_440 / 64 * halftone * halftone * halftone;
+//  for ( int midinote=24; midinote<36; midinote++ ) {
+//    sample_offset[midinote] = 0;
+//  }
   for ( int midinote=0; midinote<128; midinote++ ) {
     midi_freq[midinote] = f;
     f *= halftone; 
+    midi_vol_raw[midinote] = 0;
     midi_vol[midinote] = 0;
     sample_offset[midinote] = 0.0;
   }
@@ -454,7 +459,8 @@ int main( int argc, char *argv[] ) {
   int running = 1;
   enum cmd_t { NONE=0, 
                V16_INC, V16_DEC, V8_INC, V8_DEC, V4_INC, V4_DEC,
-               VM_INC, VM_DEC, VF_INC, VF_DEC, VR_INC, VR_DEC, 
+               VM_INC, VM_DEC, VF_INC, VF_DEC, VR_INC, VR_DEC,
+               VIB_INC, VIB_DEC,
                PANIC, QUIT } cmd = NONE;
 
   while ( running ) {
@@ -544,6 +550,16 @@ int main( int argc, char *argv[] ) {
         cmd = VR_INC;
         break;
 
+      // vibrato
+      case 'o':
+      case 'O':
+        cmd = VIB_DEC;
+        break;
+      case 'l':
+      case 'L':
+        cmd = VIB_INC;
+        break;
+
       // execute command
       case '\n':
         switch( cmd ) {
@@ -553,7 +569,7 @@ int main( int argc, char *argv[] ) {
             break;
           case PANIC:
             for ( int iii = 0; iii < 128; iii++ )
-              midi_vol[iii] = 0;
+              midi_vol[iii] = midi_vol_raw[iii] = 0;
             break;
           case V16_INC: 
             if ( vol_16 < 8 )
@@ -602,6 +618,14 @@ int main( int argc, char *argv[] ) {
           case VR_DEC: 
             if ( vol_reed > 0 )
               vol_reed--;
+            break;
+          case VIB_INC: 
+            if ( vibrato < 8 )
+              vibrato++;
+            break;
+          case VIB_DEC: 
+            if ( vibrato > 0 )
+              vibrato--;
             break;
         } // switch( cmd )
 
