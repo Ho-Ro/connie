@@ -1,0 +1,14 @@
+*.orig
+*.new
+*.rej
+*~
+*.o
+*.lst
+*.s
+Connie
+connie
+connie_i386
+connie_sse
+.connie_session
+*-stamp
+debian/*debhelper*

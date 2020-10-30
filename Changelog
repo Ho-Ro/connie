@@ -1,0 +1,8 @@
+2009-05-29
+First version: Connie 0.1 (light my fire)
+features:
+midi input noteon and noteoff and volume
+audio output
+text only "gui" in terminal
+drawbar for stops and voices
+fixed vibrato on/off
