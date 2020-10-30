@@ -1,4 +1,8 @@
 2009-06-07
+Connie 0.3.1a (beautiful noise)
+API changed: jack_client_new() -> jack_client_open()
+
+2009-06-07
 Connie 0.3.1 (beautiful noise)
 note on/off with ramp to reduce key click
 "gui" handling improved (set pc kbd non canonical)

@@ -35,7 +35,7 @@
 #include <jack/midiport.h>
 
 
-const char * connie_version = "0.3.1";
+const char * connie_version = "0.3.1a";
 const char * connie_name = "beautiful noise";
 
 // tune the instrument
@@ -409,7 +409,7 @@ int main( int argc, char *argv[] ) {
 
   /* try to become a client of the JACK server */
 
-  if ( (client = jack_client_new( name ) ) == 0 ) {
+  if ( (client = jack_client_open( name, 0, NULL ) ) == 0 ) {
     fprintf( stderr, "jack server not running?\n" );
     return 1;
   }
