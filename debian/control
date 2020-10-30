@@ -1,0 +1,16 @@
+Source: connie
+Section: sound
+Priority: optional
+Maintainer: Martin Homuth-Rosemann <linuxaudio@cryptomys.de>
+Build-Depends: debhelper (>= 7),libjack-dev
+Standards-Version: 3.8.1
+Homepage: http://cryptomys.de/horo/Connie
+
+Package: connie
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Electronic organ like e.g. Vox Continental with JACK interface
+ Connie is an electronic organ program with JACK midi in and JACK audio out.
+ The program simulates the signal flow of a typical analog polyphonic organ.
+ Besides sounding nice the source code is intended as a toolbox for writing
+ and testing own signal processing solutions.

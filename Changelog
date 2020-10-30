@@ -1,3 +1,13 @@
+2009-06-09
+connie 0.3.2 (in the cage)
+name changed Connie -> connie
+first debianized version
+use different samples (only reed voice) for each octave
+fill with bandlimited sawtooth (fmax < fsample/3) to avoid aliasing
+average between sample buffer at octave border to avoid ugly sound "jumps"
+vibrato parameter corrected
+preset programs - select via pc kbd or midi
+
 2009-06-07
 Connie 0.3.1a (beautiful noise)
 API changed: jack_client_new() -> jack_client_open()
