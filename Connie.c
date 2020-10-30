@@ -33,8 +33,8 @@
 #include <jack/midiport.h>
 
 
-const char * connie_version = "0.1";
-const char * connie_name = "light my fire";
+const char * connie_version = "0.2";
+const char * connie_name = "good vibrations";
 
 // tune the instrument
 const double concert_pitch_440 = 440.0;
@@ -46,7 +46,8 @@ const double PI = 3.14159265;
 
 /* Our ports */
 jack_port_t *midi_port;
-jack_port_t *output_port;
+jack_port_t *output_port_l;
+jack_port_t *output_port_r;
 
 typedef jack_default_audio_sample_t sample_t;
 
@@ -98,8 +99,7 @@ int volume = 64;
 int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
 
   // freq modulation for vibrato
-  static int shift_dir = 1;
-  static double f_shift = 1.0;
+  static int shift_offset = 0;
 
   // process midi events
   // *******************
@@ -143,14 +143,27 @@ int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
   int pos;
   // voice samples 
   double value_flute, value_reed;
+  double shift;
 
   // grab our audio output buffer 
-  sample_t *out = (sample_t *) jack_port_get_buffer (output_port, nframes);
+  sample_t *out_l = (sample_t *) jack_port_get_buffer (output_port_l, nframes);
+  sample_t *out_r = (sample_t *) jack_port_get_buffer (output_port_r, nframes);
 
   // fill the buffer
   // this implements the signal flow of an electronic organ
   for ( jack_nframes_t i=0; i<nframes; i++ ) {
     value_flute = value_reed = 0.0;
+
+    // shifting the pitch and volume for (simple) leslie sim
+    // shift is a sin signal used for fm and am
+    shift_offset += 10; // shift frequency (int)
+    if ( shift_offset >= sr )
+      shift_offset -= sr;
+    if ( vibrato )
+      shift = cycle[ shift_offset ];
+    else
+      shift = 0.0;
+
     // polyphonic output with drawbars vol_xx
     // advance the individual sample pointers
     // use only these notes
@@ -216,21 +229,21 @@ int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
 
           // 1 1/3' (2 oct. + fifth)
           // (for 1' like v*x c*ntinental change 77->72 and 31->36)
-          if ( note <= 77 ) 
+          if ( note <= 77 )
             pos=sample_offset[ note+31 ];
           else if ( note <= 89 )
             pos=sample_offset[ note+19 ];
           else if ( note <= 101 )
             pos=sample_offset[ note+7 ];
-          else 
+          else
             pos=sample_offset[ note-5 ];
           value_flute += vol * vol_mix * vol_mix * cycle[ pos ];
           value_reed += vol * vol_mix * vol_mix * ( 1.0 - 2.0 * pos / sr );
         }
       }
 
-      // advance individual sample pointer, do fm
-      sample_offset[note] += f_shift * midi_freq[note];
+      // advance individual sample pointer, do fm for vibrato
+      sample_offset[note] += ( 1.0 + 0.02 * shift ) * midi_freq[note];
       if ( sample_offset[note] >= sr )
         sample_offset[note] -= sr;
     } // for ( note )
@@ -238,26 +251,13 @@ int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
     // normalize the output (square law for drawbar volumes)
     // vol_16, vol_8, vol_4, vol_mix, vol_flute and vol_reed: range 0..8
     // midi_vol, volume: range 0..127
-    out[i] = 0.25 * volume * ( vol_flute * vol_flute * value_flute 
+    sample_t out;
+    out = 0.05 * volume * ( vol_flute * vol_flute * value_flute 
                             + vol_reed * vol_reed * value_reed ) 
            / ( 127 * 127 * 8 * 8 * 8 * 8 );
+    out_l[i] = out * (1.0 - shift / 4); // am for "leslie"
+    out_r[i] = out * (1.0 + shift / 4); // "
 
-    // shifting the pitch
-    if ( vibrato ) {
-      if ( shift_dir > 0 ) {
-        if ( f_shift < 1.02 )  // about +35 cent (0.06 is 100 cent)
-          f_shift += 0.5 / sr; // sr is int - USE FLOAT CONST
-        else
-          shift_dir = -1;
-      } else if ( shift_dir < 0 ) {
-        if ( f_shift > 0.98 ) // about -35 cent
-          f_shift -= 0.5 / sr;
-        else
-          shift_dir = 1;
-      }
-    } else {
-      f_shift = 1.0;
-    } // vibrato
 
   } // for ( nframes )
   return 0;
@@ -289,7 +289,7 @@ void jack_shutdown_cb( void *arg ) {
 
 
 void print_help( void ) {
-  puts( "\n\n\n\nESC\tQuit" );
+  puts( "\n\n\n\n[ESC]\tQuit\t\t[SPACE]\tPanic" );
   puts( "a q\t16' stop\tpull / shift");
   puts( "s w\t 8' stop\tpull / shift");
   puts( "d e\t 4' stop\tpull / shift");
@@ -380,9 +380,10 @@ int main( int argc, char *argv[] ) {
 
   sr = jack_get_sample_rate( client );
 
-  /* create two ports */
-  output_port = jack_port_register( client, "output", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+  /* create one midi and two  audio ports */
   midi_port = jack_port_register( client, "midi_in", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
+  output_port_l = jack_port_register( client, "left", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+  output_port_r = jack_port_register( client, "right", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
 
  /*Create 1 cycle of the wave*/
   /*Calculate the number of samples in one cycle of the wave*/
@@ -454,11 +455,14 @@ int main( int argc, char *argv[] ) {
   enum cmd_t { NONE=0, 
                V16_INC, V16_DEC, V8_INC, V8_DEC, V4_INC, V4_DEC,
                VM_INC, VM_DEC, VF_INC, VF_DEC, VR_INC, VR_DEC, 
-               QUIT } cmd = NONE;
+               PANIC, QUIT } cmd = NONE;
 
   while ( running ) {
     c = getchar();
     switch( c ) {
+      case ' ': // panic
+        cmd = PANIC;
+        break;
       // [ESC] -> QUIT
       case '\033':
         cmd = QUIT;
@@ -546,6 +550,10 @@ int main( int argc, char *argv[] ) {
           case QUIT:
             running = 0;
           case NONE:
+            break;
+          case PANIC:
+            for ( int iii = 0; iii < 128; iii++ )
+              midi_vol[iii] = 0;
             break;
           case V16_INC: 
             if ( vol_16 < 8 )
