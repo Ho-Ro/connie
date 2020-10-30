@@ -1,3 +1,14 @@
+2009-06-24
+connie 0.4.1 (summer in the city)
+Created a second organ model (test): 9 stops, percussion and vibrato.
+Cmd line args: 
+  -a : autoconnect to system:playback ports
+  -f : french AZERTY keyboard
+  -g : german QWERTZ keyboard
+  -t Num : organ type, 0 = connie (default), 1 = test
+Modularized the source code.
+Cleanup of user interface. 
+
 2009-06-13
 connie 0.4.0 (land ho!)
 I like this version - it's a big step forward

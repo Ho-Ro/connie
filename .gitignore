@@ -10,5 +10,6 @@ connie
 connie_i386
 connie_sse
 .connie_session
+tags
 *-stamp
 debian/*debhelper*

@@ -1,6 +1,6 @@
-connie (0.4.0) experimental; urgency=low
+connie (0.4.1) experimental; urgency=low
 
-  * New Release: improved sound generation - see Changelog
-  * Initial Release.
 
- -- Martin Homuth-Rosemann <homuth-rosemann@cryptomys.de>  Sat, 13 Jun 2009 18:27:28 +0200
+  * Second organ model, i18n, source code modularization - see Changelog 
+
+ -- Martin Homuth-Rosemann <homuth-rosemann@cryptomys.de>  Fri, 26 Jun 2009 19:51:40 +0200
