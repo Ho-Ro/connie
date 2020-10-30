@@ -22,19 +22,21 @@
  *
  *****************************************************************************/
 
-
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <termios.h>
+#include <signal.h>
+
 
 #include <jack/jack.h>
 #include <jack/midiport.h>
 
 
-const char * connie_version = "0.3";
-const char * connie_name = "house of the rising sun";
+const char * connie_version = "0.3.1";
+const char * connie_name = "beautiful noise";
 
 // tune the instrument
 const double concert_pitch_440 = 440.0;
@@ -44,10 +46,18 @@ const double halftone = 1.059463094;
 
 const double PI = 3.14159265;
 
-/* Our ports */
+const int LOWNOTE=24;
+const int HIGHNOTE=96;
+
+/* Our jack client and the ports */
+jack_client_t *client = NULL;
 jack_port_t *midi_port;
 jack_port_t *output_port_l;
 jack_port_t *output_port_r;
+
+
+struct termios term_orig;
+
 
 typedef jack_default_audio_sample_t sample_t;
 
@@ -82,13 +92,13 @@ int midi_prog = 0;
 
 // the drawbar volumes (vol_xx = 0..8)
 // stops
-int vol_16 = 8;
+int vol_16 = 6;
 int vol_8 = 8;
-int vol_4 = 8;
-int vol_mix = 8;
+int vol_4 = 6;
+int vol_mix = 4;
 // voices
 int vol_flute = 8;
-int vol_reed = 0;
+int vol_reed = 4;
 // vibrato 
 int vibrato = 0;
 
@@ -150,6 +160,8 @@ int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
   double value_flute, value_reed;
   double shift;
 
+  static int timer = 0;
+
   // grab our audio output buffer 
   sample_t *out_l = (sample_t *) jack_port_get_buffer (output_port_l, nframes);
   sample_t *out_r = (sample_t *) jack_port_get_buffer (output_port_r, nframes);
@@ -161,7 +173,8 @@ int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
 
     // shifting the pitch and volume for (simple) leslie sim
     // shift is a sin signal used for fm and am
-    shift_offset += 2 * vibrato; // shift frequency (int)
+    // vibrato 0..8 -> freq 0..8 Hz
+    shift_offset += vibrato; // shift frequency (int)
     if ( shift_offset >= sr )
       shift_offset -= sr;
     if ( vibrato )
@@ -172,20 +185,19 @@ int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
     // polyphonic output with drawbars vol_xx
     // advance the individual sample pointers
     //
-    int note = 24;
-    for ( int octave = 1; octave <=32; octave *= 2 ) {
-      for ( int tone = 24; tone < 36; tone++, note++ ) {
+    int note = LOWNOTE;
+    for ( int octave = 1; octave <=32; octave *= 2 ) { // 6 octaves 1,2,4,8,16,32
+      for ( int tone = LOWNOTE; tone < LOWNOTE+12; tone++, note++ ) {
         int vol = midi_vol[note];
-        //vol = 64;
         if ( vol ) { // note actually playing
           // use square law for drawbar volume
           // 16' stop (subharmonic)
-          if ( vol_16 && note >= 36) {
+          if ( vol_16 && note >= LOWNOTE+12) {
             pos = sample_offset[ tone ] * octave / 2;
             while ( pos >= sr )
               pos -= sr;
             value_flute += vol * vol_16 * vol_16 * cycle[ pos ];
-            value_reed += vol * vol_16 * vol_16 * cycle_rd[ pos ];
+            value_reed  += vol * vol_16 * vol_16 * cycle_rd[ pos ];
           }
 
           // 8' stop (unison stop)
@@ -194,7 +206,7 @@ int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
             while ( pos >= sr )
               pos -= sr;
             value_flute +=  vol * vol_8 * vol_8 * cycle[ pos ];
-            value_reed += vol * vol_8 * vol_8 * cycle_rd[ pos ];
+            value_reed  += vol * vol_8 * vol_8 * cycle_rd[ pos ];
           }
 
           // 4' stop (octave)
@@ -203,7 +215,7 @@ int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
             while ( pos >= sr )
               pos -= sr;
             value_flute += vol * vol_4 * vol_4 * cycle[ pos ];
-            value_reed += vol * vol_4 * vol_4 * cycle_rd[ pos ];
+            value_reed  += vol * vol_4 * vol_4 * cycle_rd[ pos ];
           }
 
           // mixture stop
@@ -212,18 +224,21 @@ int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
             while ( pos >= sr )
               pos -= sr;
             value_flute += vol * vol_mix * vol_mix * mixture[ pos ];
-            value_reed += vol * vol_mix * vol_mix * mixture_rd[ pos ];
+            value_reed  += vol * vol_mix * vol_mix * mixture_rd[ pos ];
           }
         } // if ( vol )
       } // for ( tone )
     } // for ( octave )
-    for ( note =24; note < 36; note++ ) {
+    for ( note =LOWNOTE; note < LOWNOTE+12; note++ ) {
       // advance individual sample pointer, do fm for vibrato
-      sample_offset[note] += ( 1.0 + 0.02 * shift * vibrato / 8 ) * midi_freq[note];
-      if ( sample_offset[note] >= sr ) { // zero xing
+      // vibrato 0..8 -> 0..8 Hz rot. speed
+      // typical leslie horn length 0.25 m 
+      // at rotation speed 1/s the transl. speed of horn mouth ist v=1.5m/s
+      // the doppler formula: f' = f * 1 / ( 1 - v/c )
+      // at 1 Hz -> f' = 1 +- 0.005 ( 8 cent shift per Hz )
+      sample_offset[note] += ( 1.0 + 0.005 * shift * vibrato  ) * midi_freq[note];
+      if ( sample_offset[note] >= sr ) { // zero crossing
         sample_offset[note] -= sr;
-        for ( int octave = 0; octave < 96; octave += 12 )
-          midi_vol[note+octave] = midi_vol_raw[note+octave]; // change key status at zero xing
       }
     } // for ( note )
 
@@ -231,16 +246,27 @@ int rt_process_cb( jack_nframes_t nframes, void *void_arg ) {
     // vol_16, vol_8, vol_4, vol_mix, vol_flute and vol_reed: range 0..8
     // midi_vol, volume: range 0..127
     sample_t out;
-    out = 0.05 * volume * ( vol_flute * vol_flute * value_flute 
+    out = 0.1 * volume * ( vol_flute * vol_flute * value_flute 
                             + vol_reed * vol_reed * value_reed ) 
            / ( 127 * 127 * 8 * 8 * 8 * 8 );
     out_l[i] = out * (1.0 - shift / 4); // am for "leslie"
     out_r[i] = out * (1.0 + shift / 4); // "
 
-
+    // ramp the midi volumes up/down to remove the clicking at key press/release
+    if ( ++timer > sr / 8000 ) { // every 125µs
+      timer = 0;
+      int *p_vol = midi_vol + LOWNOTE;
+      int *p_raw = midi_vol_raw + LOWNOTE;
+      for ( note = LOWNOTE; note < HIGHNOTE; note++, p_vol++, p_raw++ ) {
+        if ( *p_vol < *p_raw )
+          (*p_vol)++;
+        if ( *p_vol > *p_raw )
+          (*p_vol)--;
+      } // for ( note )
+    } // if /( timer )
   } // for ( nframes )
   return 0;
-}
+} // rt_process_cb()
 
 
 
@@ -267,16 +293,41 @@ void jack_shutdown_cb( void *arg ) {
 
 
 
+void connie_shutdown( void )
+{
+  // restore term settings
+  tcsetattr( 1, 0, &term_orig );
+
+  if ( client ) {
+    //puts( "client_close()" );
+    jack_client_close( client );
+    client = NULL;
+  }
+  printf("\n");
+}
+
+
+
+// The signal handler function
+void ctrl_c_handler( int sig) {
+  //signal( SIGINT, ctrl_c_handler );
+  printf( "Abort...\n");
+  exit( 0 );
+}  // handler
+
+
+
+
 void print_help( void ) {
   puts( "\n\n\n\n" );
   puts( "[ESC]\tQuit\t\t[SPACE]\tPanic" );
-  puts( "a q\t16' stop\tpull / shift");
-  puts( "s w\t 8' stop\tpull / shift");
-  puts( "d e\t 4' stop\tpull / shift");
-  puts( "f r\tmix stop\tpull / shift");
-  puts( "j u\tflute voice\tpull / shift");
-  puts( "k i\treed voice\tpull / shift");
-  puts( "l o\tvibrato\t\tpull / shift\n");
+  puts( "A Q\t16' stop\tpull / shift");
+  puts( "S W\t 8' stop\tpull / shift");
+  puts( "D E\t 4' stop\tpull / shift");
+  puts( "F R\tmix stop\tpull / shift");
+  puts( "J U\tflute voice\tpull / shift");
+  puts( "K I\treed voice\tpull / shift");
+  puts( "L O\tvibrato\t\tpull / shift\n");
 }
 
 
@@ -285,7 +336,7 @@ void print_status( void ) {
   printf( "Connie %s (%s)\n", connie_version, connie_name );
   printf( "+---------------------------------+\n" );
   printf( "| 16'  8'  4' mix   fl  rd    vib |\n" );
-  printf( "+---------------------------------+\n" );
+  printf( "+--Q---W---E---R-----U---I-----O--+\n" );
   for ( int line = 0; line < 8; line++ ) {
     printf( "|  %c   %c   %c   %c     %c   %c     %c  |\n", 
   	vol_16>line?'#':' ', vol_8>line?'#':' ', 
@@ -293,7 +344,7 @@ void print_status( void ) {
   	vol_flute>line?'#':' ', vol_reed>line?'#':' ', 
   	vibrato>line?'#':' ' );
   }
-  printf( "+---------------------------------+\n" );
+  printf( "+--A---S---D---F-----J---K-----L--+\n" );
 }
 
 // sawtooth 
@@ -308,9 +359,32 @@ double saw( double arg ) {
 }
 
 
+double saw_( double arg ) {
+  while ( arg >= 2 * PI )
+    arg -= 2 * PI;
+    return cos( arg / 2 );
+}
+
+
+
 int main( int argc, char *argv[] ) {
 
   char *name = "Connie";
+
+
+
+// Registering the handler, catching SIGINT signals
+  signal( SIGINT, ctrl_c_handler );
+
+
+  struct termios t;
+  // get term status
+  tcgetattr (1, &t);
+  term_orig = t; // store status in global var
+  // set keyboard to non canonical mode
+  t.c_lflag &= ~(ICANON | ECHO);
+  tcsetattr (1, 0, &t);
+
 
   if (argc >= 2) {
     name = argv[1];
@@ -334,7 +408,6 @@ int main( int argc, char *argv[] ) {
 
 
   /* try to become a client of the JACK server */
-  jack_client_t *client;
 
   if ( (client = jack_client_new( name ) ) == 0 ) {
     fprintf( stderr, "jack server not running?\n" );
@@ -426,6 +499,8 @@ int main( int argc, char *argv[] ) {
     return 1;
   }
 
+  atexit( connie_shutdown );
+
 #ifdef AUTOCONNECT
 // DON'T autoconnect - maybe as an cmd line option
 // ===============================================
@@ -480,16 +555,6 @@ int main( int argc, char *argv[] ) {
         vol_16 = vol_8 = vol_4 = vol_mix = vol_flute = 8;
         vol_reed = 0;
         vibrato = 0;
-        break;
-
-      // vibrato on/off
-      case 'v':
-      case 'V':
-        cmd = NONE;
-        if ( vibrato ) 
-          vibrato = 0;
-        else
-          vibrato = 1;
         break;
 
       // stop drawbars
@@ -560,79 +625,6 @@ int main( int argc, char *argv[] ) {
         cmd = VIB_INC;
         break;
 
-      // execute command
-      case '\n':
-        switch( cmd ) {
-          case QUIT:
-            running = 0;
-          case NONE:
-            break;
-          case PANIC:
-            for ( int iii = 0; iii < 128; iii++ )
-              midi_vol[iii] = midi_vol_raw[iii] = 0;
-            break;
-          case V16_INC: 
-            if ( vol_16 < 8 )
-              vol_16++;
-            break;
-          case V16_DEC: 
-            if ( vol_16 > 0 )
-              vol_16--;
-            break;
-          case V8_INC: 
-            if ( vol_8 < 8 )
-              vol_8++;
-            break;
-          case V8_DEC: 
-            if ( vol_8 > 0 )
-              vol_8--;
-            break;
-          case V4_INC: 
-            if ( vol_4 < 8 )
-              vol_4++;
-            break;
-          case V4_DEC: 
-            if ( vol_4 > 0 )
-              vol_4--;
-            break;
-          case VM_INC: 
-            if ( vol_mix < 8 )
-              vol_mix++;
-            break;
-          case VM_DEC: 
-            if ( vol_mix > 0 )
-              vol_mix--;
-            break;
-          case VF_INC: 
-            if ( vol_flute < 8 )
-              vol_flute++;
-            break;
-          case VF_DEC: 
-            if ( vol_flute > 0 )
-              vol_flute--;
-            break;
-          case VR_INC: 
-            if ( vol_reed < 8 )
-              vol_reed++;
-            break;
-          case VR_DEC: 
-            if ( vol_reed > 0 )
-              vol_reed--;
-            break;
-          case VIB_INC: 
-            if ( vibrato < 8 )
-              vibrato++;
-            break;
-          case VIB_DEC: 
-            if ( vibrato > 0 )
-              vibrato--;
-            break;
-        } // switch( cmd )
-
-        if ( running ) {
-          print_help();
-          print_status();
-        }
         break;
 
       // catch undefined cmds
@@ -641,9 +633,84 @@ int main( int argc, char *argv[] ) {
         cmd = NONE;
         break;
     } // switch( c )
+
+    // execute command
+    switch( cmd ) {
+      case QUIT:
+        printf( "QUIT? [y/N] :" );
+        c = getchar();
+        if ( 'y' == c || 'Y' == c )
+          running = 0;
+      case NONE:
+        break;
+      case PANIC:
+        for ( int iii = 0; iii < 128; iii++ )
+          midi_vol[iii] = midi_vol_raw[iii] = 0;
+        break;
+      case V16_INC: 
+        if ( vol_16 < 8 )
+          vol_16++;
+        break;
+      case V16_DEC: 
+        if ( vol_16 > 0 )
+          vol_16--;
+        break;
+      case V8_INC: 
+        if ( vol_8 < 8 )
+          vol_8++;
+        break;
+      case V8_DEC: 
+        if ( vol_8 > 0 )
+          vol_8--;
+        break;
+      case V4_INC: 
+        if ( vol_4 < 8 )
+          vol_4++;
+        break;
+      case V4_DEC: 
+        if ( vol_4 > 0 )
+          vol_4--;
+        break;
+      case VM_INC: 
+        if ( vol_mix < 8 )
+          vol_mix++;
+        break;
+      case VM_DEC: 
+        if ( vol_mix > 0 )
+          vol_mix--;
+        break;
+      case VF_INC: 
+        if ( vol_flute < 8 )
+          vol_flute++;
+        break;
+      case VF_DEC: 
+        if ( vol_flute > 0 )
+          vol_flute--;
+        break;
+      case VR_INC: 
+        if ( vol_reed < 8 )
+          vol_reed++;
+        break;
+      case VR_DEC: 
+        if ( vol_reed > 0 )
+          vol_reed--;
+        break;
+      case VIB_INC: 
+        if ( vibrato < 8 )
+          vibrato++;
+        break;
+      case VIB_DEC: 
+        if ( vibrato > 0 )
+          vibrato--;
+        break;
+    } // switch( cmd )
+    if ( running ) {
+      print_help();
+      print_status();
+    }
   } //while running
 
-  jack_client_close( client );
+  connie_shutdown();
   free( cycle );
 
   exit( 0 );
